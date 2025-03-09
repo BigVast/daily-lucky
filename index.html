@@ -840,12 +840,13 @@
         }
 
         // 页面加载时检查登录状态
-        window.addEventListener('load', () => {
+        window.addEventListener('load', async () => {
             const savedUser = localStorage.getItem('currentUser');
             if (savedUser) {
                 currentUser = JSON.parse(savedUser);
                 updateLoginButton();
-                loadUserNotes();
+                await loadUserNotes();
+                startRealtimeSync(); // 启动实时同步
             }
         });
 
