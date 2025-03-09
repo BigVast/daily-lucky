@@ -47,8 +47,12 @@
         }
 
         .add-btn {
-            width: 40px;
-            height: 40px;
+            position: fixed;
+            bottom: 30px;
+            right: 50%;
+            transform: translateX(300px);
+            width: 56px;
+            height: 56px;
             border-radius: 50%;
             background-color: #007AFF;
             color: white;
@@ -58,6 +62,25 @@
             display: flex;
             align-items: center;
             justify-content: center;
+            box-shadow: 0 4px 12px rgba(0, 122, 255, 0.3);
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+
+        .add-btn:hover {
+            transform: translateX(300px) scale(1.1);
+            box-shadow: 0 6px 16px rgba(0, 122, 255, 0.4);
+        }
+
+        @media (max-width: 600px) {
+            .add-btn {
+                right: 20px;
+                transform: none;
+            }
+            
+            .add-btn:hover {
+                transform: scale(1.1);
+            }
         }
 
         .notes-container {
@@ -230,13 +253,94 @@
         .import-input {
             display: none;
         }
+
+        .data-manage-btn {
+            background: rgba(0, 122, 255, 0.1);
+            color: #007AFF;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 6px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+
+        .data-manage-btn:hover {
+            background: rgba(0, 122, 255, 0.2);
+        }
+
+        .data-manage-modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.5);
+            z-index: 2000;
+        }
+
+        .data-manage-content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 12px;
+            width: 90%;
+            max-width: 320px;
+        }
+
+        .data-manage-title {
+            font-size: 18px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            text-align: center;
+        }
+
+        .data-manage-buttons {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .data-btn {
+            background: #007AFF;
+            color: white;
+            border: none;
+            padding: 12px;
+            border-radius: 8px;
+            font-size: 15px;
+            cursor: pointer;
+            transition: background 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+
+        .data-btn:hover {
+            background: #0056b3;
+        }
+
+        .close-btn {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            background: none;
+            border: none;
+            font-size: 20px;
+            cursor: pointer;
+            color: #666;
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-content">
-            <div class="title">今日好事发生</div>
-            <button class="add-btn" onclick="showModal()">+</button>
+            <div class="title">我的笔记</div>
+            <button class="data-manage-btn" onclick="showDataManage()">数据管理</button>
         </div>
     </div>
 
@@ -251,6 +355,24 @@
                 <button class="modal-btn" onclick="saveNote()">保存</button>
             </div>
             <textarea id="noteInput" placeholder="输入笔记内容..."></textarea>
+        </div>
+    </div>
+
+    <button class="add-btn" onclick="showModal()">+</button>
+
+    <div class="data-manage-modal" id="dataManageModal">
+        <div class="data-manage-content">
+            <button class="close-btn" onclick="hideDataManage()">×</button>
+            <div class="data-manage-title">数据管理</div>
+            <div class="data-manage-buttons">
+                <button class="data-btn" onclick="exportData()">
+                    <span>📤</span>导出备份
+                </button>
+                <input type="file" id="importInput" class="import-input" accept=".json" onchange="importData(event)">
+                <button class="data-btn" onclick="document.getElementById('importInput').click()">
+                    <span>📥</span>导入备份
+                </button>
+            </div>
         </div>
     </div>
 
@@ -360,11 +482,6 @@
                     </div>
                     <div class="lucky-content" id="luckyMessage"></div>
                 </div>
-                <div class="backup-buttons">
-                    <button class="backup-btn" onclick="exportData()">导出备份</button>
-                    <input type="file" id="importInput" class="import-input" accept=".json" onchange="importData(event)">
-                    <button class="backup-btn" onclick="document.getElementById('importInput').click()">导入备份</button>
-                </div>
                 ${notesHtml}
             `;
             
@@ -469,6 +586,23 @@
                 event.target.value = '';
             }
         }
+
+        // 显示数据管理模态框
+        function showDataManage() {
+            document.getElementById('dataManageModal').style.display = 'block';
+        }
+
+        // 隐藏数据管理模态框
+        function hideDataManage() {
+            document.getElementById('dataManageModal').style.display = 'none';
+        }
+
+        // 点击模态框外部关闭
+        document.getElementById('dataManageModal').addEventListener('click', function(e) {
+            if (e.target === this) {
+                hideDataManage();
+            }
+        });
 
         // 初始化显示笔记和好运消息
         renderNotes();
