@@ -515,21 +515,28 @@
                 notes.unshift(note);
                 
                 try {
-                    // 保存到本地
-                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
-                    
+                    console.log('开始同步到云端...');
                     // 同步到 Firebase
                     await setDoc(doc(db, 'users', currentUser.username), {
                         notes: notes,
                         lastUpdated: new Date().toISOString()
                     });
+                    console.log('同步成功');
+                    
+                    // 保存到本地
+                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
                     
                     renderNotes();
                     hideModal();
                     document.getElementById('noteInput').value = '';
                     showToast('笔记已保存并同步到云端');
                 } catch (error) {
-                    console.error('Sync error:', error);
+                    console.error('同步错误:', error);
+                    // 保存到本地
+                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
+                    renderNotes();
+                    hideModal();
+                    document.getElementById('noteInput').value = '';
                     showToast('云端同步失败，但已保存到本地');
                 }
             }
