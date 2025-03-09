@@ -334,13 +334,56 @@
             cursor: pointer;
             color: #666;
         }
+
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+        }
+
+        .login-input {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 6px;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+
+        #loginModal .data-manage-buttons {
+            padding: 10px 0;
+        }
+
+        /* 在现有样式的末尾添加 toast 样式 */
+        .toast {
+            position: fixed;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 12px 24px;
+            border-radius: 8px;
+            font-size: 14px;
+            z-index: 2000;
+            animation: fadeInOut 3s ease;
+        }
+
+        @keyframes fadeInOut {
+            0% { opacity: 0; transform: translate(-50%, 20px); }
+            15% { opacity: 1; transform: translate(-50%, 0); }
+            85% { opacity: 1; transform: translate(-50%, 0); }
+            100% { opacity: 0; transform: translate(-50%, -20px); }
+        }
     </style>
 </head>
 <body>
     <div class="header">
         <div class="header-content">
             <div class="title">我的笔记</div>
-            <button class="data-manage-btn" onclick="showDataManage()">数据管理</button>
+            <div class="header-buttons">
+                <button class="data-manage-btn" onclick="showDataManage()">数据管理</button>
+                <button class="data-manage-btn" id="loginBtn" onclick="showLoginModal()">登录</button>
+            </div>
         </div>
     </div>
 
@@ -376,6 +419,42 @@
         </div>
     </div>
 
+    <div class="data-manage-modal" id="loginModal">
+        <div class="data-manage-content">
+            <button class="close-btn" onclick="hideLoginModal()">×</button>
+            <div class="data-manage-title">用户登录</div>
+            <div class="data-manage-buttons">
+                <input type="text" id="usernameInput" class="login-input" placeholder="用户名">
+                <input type="password" id="passwordInput" class="login-input" placeholder="密码">
+                <button class="data-btn" onclick="login()">
+                    <span>🔑</span>登录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 添加 Firebase SDK -->
+    <script type="module">
+        // Import the functions you need from the SDKs
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
+
+        // Your web app's Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCJ0gI2V_hMxFGKS7-U2uB41XfmpOmThm8",
+            authDomain: "daily-lucky-web.firebaseapp.com",
+            projectId: "daily-lucky-web",
+            storageBucket: "daily-lucky-web.firebasestorage.app",
+            messagingSenderId: "222257665659",
+            appId: "1:222257665659:web:7119cd4d395ec8e92a34de"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        window.db = db;
+    </script>
+
     <script>
         // 好运消息数组
         const luckyMessages = [
@@ -390,6 +469,15 @@
             "遇到困难别担心，贵人会及时相助",
             "⭐ 今天的决定会带来意想不到的好结果"
         ];
+
+        // 预设的用户账号列表
+        const validUsers = {
+            'admin': 'admin123',
+            'test': 'test123'
+        };
+
+        // 当前登录的用户信息
+        let currentUser = null;
 
         // 获取存储的笔记
         let notes = JSON.parse(localStorage.getItem('notes') || '[]');
@@ -408,8 +496,14 @@
             document.getElementById('noteModal').style.display = 'none';
         }
 
-        // 保存笔记
-        function saveNote() {
+        // 修改 saveNote 函数
+        async function saveNote() {
+            if (!currentUser) {
+                showToast('请先登录');
+                showLoginModal();
+                return;
+            }
+
             const noteText = document.getElementById('noteInput').value.trim();
             if (noteText) {
                 const note = {
@@ -417,19 +511,53 @@
                     text: noteText,
                     date: new Date().toISOString()
                 };
+                
                 notes.unshift(note);
-                localStorage.setItem('notes', JSON.stringify(notes));
-                renderNotes();
-                hideModal();
+                
+                try {
+                    // 保存到本地
+                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
+                    
+                    // 同步到 Firebase
+                    await setDoc(doc(db, 'users', currentUser.username), {
+                        notes: notes,
+                        lastUpdated: new Date().toISOString()
+                    });
+                    
+                    renderNotes();
+                    hideModal();
+                    document.getElementById('noteInput').value = '';
+                    showToast('笔记已保存并同步到云端');
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    showToast('云端同步失败，但已保存到本地');
+                }
             }
         }
 
-        // 删除笔记
-        function deleteNote(id) {
+        // 修改 deleteNote 函数
+        async function deleteNote(id) {
+            if (!currentUser) return;
+            
             if (confirm('确定要删除这条笔记吗？')) {
                 notes = notes.filter(note => note.id !== id);
-                localStorage.setItem('notes', JSON.stringify(notes));
-                renderNotes();
+                
+                try {
+                    // 保存到本地
+                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
+                    
+                    // 同步到 Firebase
+                    await setDoc(doc(db, 'users', currentUser.username), {
+                        notes: notes,
+                        lastUpdated: new Date().toISOString()
+                    });
+                    
+                    renderNotes();
+                    showToast('笔记已删除并同步到云端');
+                } catch (error) {
+                    console.error('Sync error:', error);
+                    showToast('云端同步失败，但已在本地删除');
+                }
             }
         }
 
@@ -601,6 +729,123 @@
         document.getElementById('dataManageModal').addEventListener('click', function(e) {
             if (e.target === this) {
                 hideDataManage();
+            }
+        });
+
+        // 显示登录框
+        function showLoginModal() {
+            document.getElementById('loginModal').style.display = 'block';
+        }
+
+        // 隐藏登录框
+        function hideLoginModal() {
+            document.getElementById('loginModal').style.display = 'none';
+            document.getElementById('usernameInput').value = '';
+            document.getElementById('passwordInput').value = '';
+        }
+
+        // 登录功能
+        function login() {
+            const username = document.getElementById('usernameInput').value;
+            const password = document.getElementById('passwordInput').value;
+
+            if (validUsers[username] && validUsers[username] === password) {
+                currentUser = { username };
+                localStorage.setItem('currentUser', JSON.stringify(currentUser));
+                updateLoginButton();
+                loadUserNotes();
+                hideLoginModal();
+                showToast('登录成功！');
+            } else {
+                showToast('用户名或密码错误');
+            }
+        }
+
+        // 退出登录
+        function logout() {
+            if (confirm('确定要退出登录吗？')) {
+                currentUser = null;
+                localStorage.removeItem('currentUser');
+                notes = [];
+                renderNotes();
+                updateLoginButton();
+                showToast('已退出登录');
+            }
+        }
+
+        // 更新登录按钮状态
+        function updateLoginButton() {
+            const loginBtn = document.getElementById('loginBtn');
+            if (currentUser) {
+                loginBtn.textContent = `${currentUser.username} (退出)`;
+                loginBtn.onclick = logout;
+            } else {
+                loginBtn.textContent = '登录';
+                loginBtn.onclick = showLoginModal;
+            }
+        }
+
+        // 修改 loadUserNotes 函数
+        async function loadUserNotes() {
+            if (!currentUser) return;
+            
+            try {
+                // 先从 Firebase 加载
+                const docRef = doc(db, 'users', currentUser.username);
+                const docSnap = await getDoc(docRef);
+                
+                if (docSnap.exists()) {
+                    notes = docSnap.data().notes;
+                    localStorage.setItem(`notes_${currentUser.username}`, JSON.stringify(notes));
+                    renderNotes();
+                    showToast('已从云端加载最新数据');
+                } else {
+                    // 如果云端没有数据，使用本地数据
+                    const localNotes = localStorage.getItem(`notes_${currentUser.username}`);
+                    if (localNotes) {
+                        notes = JSON.parse(localNotes);
+                        renderNotes();
+                        // 同步到云端
+                        await setDoc(docRef, {
+                            notes: notes,
+                            lastUpdated: new Date().toISOString()
+                        });
+                    } else {
+                        notes = [];
+                        renderNotes();
+                    }
+                }
+            } catch (error) {
+                console.error('Load error:', error);
+                // 如果云端加载失败，使用本地数据
+                const localNotes = localStorage.getItem(`notes_${currentUser.username}`);
+                if (localNotes) {
+                    notes = JSON.parse(localNotes);
+                    renderNotes();
+                    showToast('无法连接到云端，已加载本地数据');
+                }
+            }
+        }
+
+        // 添加提示框功能
+        function showToast(message) {
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.textContent = message;
+            document.body.appendChild(toast);
+            
+            setTimeout(() => {
+                toast.remove();
+            }, 3000);
+        }
+
+        // 页面加载时检查登录状态
+        window.addEventListener('load', () => {
+            const savedUser = localStorage.getItem('currentUser');
+            if (savedUser) {
+                currentUser = JSON.parse(savedUser);
+                updateLoginButton();
+                loadUserNotes();
             }
         });
 
